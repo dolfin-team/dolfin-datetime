@@ -2,7 +2,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/dolfin-datetime.svg)](https://crates.io/crates/dolfin-datetime)
 [![docs.rs](https://docs.rs/dolfin-datetime/badge.svg)](https://docs.rs/dolfin-datetime)
-[![license](https://img.shields.io/crates/l/dolfin-datetime.svg)](https://github.com/dolfin-team/dolfin-analysis)
+[![license](https://img.shields.io/crates/l/dolfin-datetime.svg)](https://github.com/dolfin-team/dolfin-datetime)
 
 Date, time, datetime and duration parsing for the [Dolfin Langugage](https://github.com/dolfin-team).
 
