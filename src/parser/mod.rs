@@ -39,10 +39,10 @@ pub fn parse_temporal(
     }
 
     // 4. Duration. A mask makes no sense for a duration, so require none.
-    if mask.is_none() {
-        if let Some(res) = duration::try_duration(value) {
-            return res.map(TemporalExpr::Duration);
-        }
+    if mask.is_none()
+        && let Some(res) = duration::try_duration(value)
+    {
+        return res.map(TemporalExpr::Duration);
     }
 
     Err(date_err.unwrap_or_else(|| TemporalError::ParseError {
