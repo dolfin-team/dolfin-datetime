@@ -1,0 +1,23 @@
+[package]
+name = "dolfin-datetime"
+edition = "2024"
+version = "0.1.8"
+description = "Date, time, datetime and duration parsing for the Dolfin DSL"
+
+[dependencies]
+thiserror = "2.0.18"
+nom = "7"
+time = { version = "0.3", default-features = false, features = ["alloc"] }
+tzdb = { version = "0.7", optional = true }
+
+[dependencies.serde]
+version = "1"
+optional = true
+features = ["derive"]
+
+[features]
+default = ["iana-tz"]
+iana-tz = ["dep:tzdb"]
+serde = ["dep:serde"]
+
+[dev-dependencies]
