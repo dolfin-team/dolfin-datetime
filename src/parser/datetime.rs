@@ -6,7 +6,7 @@ use crate::context::TemporalContext;
 use crate::error::TemporalError;
 use crate::parser::date::try_date;
 use crate::parser::time::try_time;
-use crate::types::DateTime;
+use crate::types::{Date, DateTime, Time};
 
 /// Split `input` into (date-part, time-part). The time part is recognised by
 /// the first whitespace-separated token that contains a `:`. Returns `None`
@@ -51,10 +51,27 @@ pub(crate) fn try_datetime(
         Some(Err(e)) => return Some(Err(e)),
         None => return None,
     };
-    let time = match try_time(time_str, ctx) {
+    // Parse the time without the file-level zone: a named zone's offset
+    // depends on the date (DST), so it is applied below with the full instant.
+    let mut time = match try_time(time_str, &TemporalContext::strict()) {
         Some(Ok(t)) => t,
         Some(Err(e)) => return Some(Err(e)),
         None => return None,
     };
+    if let (None, Some(tz)) = (time.offset, &ctx.timezone) {
+        match tz.resolve_at(local_secs(date, time)) {
+            Ok(off) => time.offset = Some(off),
+            Err(e) => return Some(Err(e)),
+        }
+    }
     Some(Ok(DateTime { date, time }))
+}
+
+/// Seconds from 1970-01-01T00:00 to this wall-clock date and time.
+fn local_secs(date: Date, time: Time) -> i64 {
+    let days = time::Month::try_from(date.month)
+        .and_then(|m| time::Date::from_calendar_date(date.year, m, date.day))
+        .map(|d| i64::from(d.to_julian_day()) - 2_440_588) // Julian day of 1970-01-01
+        .unwrap_or(0); // unreachable: only validated dates get here
+    days * 86_400 + i64::from(time.hour) * 3600 + i64::from(time.minute) * 60 + i64::from(time.second)
 }

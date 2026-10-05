@@ -40,10 +40,17 @@ pub fn resolve_abbrev(token: &str) -> Option<UtcOffset> {
 /// Resolve a file-level timezone name to a `UtcOffset`.
 ///
 /// Accepts, in order: a fixed offset `±HH:MM`, a known abbreviation, or (with
-/// the `iana-tz` feature) an IANA name like `Europe/Brussels`. IANA names are
-/// resolved to their *current* offset; DST for historical instants is out of
-/// scope for compile-time literal serialisation.
+/// the `iana-tz` feature) an IANA name like `Europe/Brussels`. With no instant
+/// to go by, an IANA name resolves to its offset at the Unix epoch (standard
+/// time); use [`resolve_named_at`] when the wall-clock instant is known.
 pub fn resolve_named(name: &str) -> Result<UtcOffset, TemporalError> {
+    resolve_named_at(name, 0)
+}
+
+/// Like [`resolve_named`], but an IANA name resolves to the offset in force at
+/// the wall-clock instant `local_secs` (seconds since 1970-01-01T00:00 local
+/// time), so daylight saving time is honoured.
+pub fn resolve_named_at(name: &str, local_secs: i64) -> Result<UtcOffset, TemporalError> {
     let trimmed = name.trim();
 
     if let Some(off) = parse_fixed_offset(trimmed) {
@@ -52,7 +59,7 @@ pub fn resolve_named(name: &str) -> Result<UtcOffset, TemporalError> {
     if let Some(off) = resolve_abbrev(trimmed) {
         return Ok(off);
     }
-    resolve_iana(trimmed)
+    resolve_iana(trimmed, local_secs)
 }
 
 /// Parse a `±HH:MM` fixed offset. Returns `None` if the shape does not match.
@@ -79,21 +86,24 @@ fn parse_fixed_offset(s: &str) -> Option<UtcOffset> {
 }
 
 #[cfg(feature = "iana-tz")]
-fn resolve_iana(name: &str) -> Result<UtcOffset, TemporalError> {
+fn resolve_iana(name: &str, local_secs: i64) -> Result<UtcOffset, TemporalError> {
     let tz = tzdb::tz_by_name(name)
         .ok_or_else(|| TemporalError::UnknownTimezone(name.to_string()))?;
-    // Offset at the Unix epoch is a stable, deterministic representative for a
-    // compile-time literal that carries no instant of its own.
-    let secs = tz
-        .find_local_time_type(0)
-        .map_err(|_| TemporalError::UnknownTimezone(name.to_string()))?
-        .ut_offset();
+    let offset_at = |unix: i64| {
+        tz.find_local_time_type(unix)
+            .map(|t| i64::from(t.ut_offset()))
+            .map_err(|_| TemporalError::UnknownTimezone(name.to_string()))
+    };
+    // Wall clock -> UTC needs the offset we are looking for: guess with the
+    // offset at the wall clock read as UTC, then take the offset at the
+    // resulting instant (exact except inside a DST gap or overlap).
+    let secs = offset_at(local_secs - offset_at(local_secs)?)?;
     Ok(UtcOffset {
-        total_minutes: secs / 60,
+        total_minutes: (secs / 60) as i32,
     })
 }
 
 #[cfg(not(feature = "iana-tz"))]
-fn resolve_iana(name: &str) -> Result<UtcOffset, TemporalError> {
+fn resolve_iana(name: &str, _local_secs: i64) -> Result<UtcOffset, TemporalError> {
     Err(TemporalError::UnknownTimezone(name.to_string()))
 }

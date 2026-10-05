@@ -1,7 +1,7 @@
 //! File-level defaults passed to every `parse_temporal` call (§3.5, §7).
 
 use crate::error::TemporalError;
-use crate::timezone::resolve_named;
+use crate::timezone::{resolve_named, resolve_named_at};
 use crate::types::UtcOffset;
 
 #[cfg(feature = "serde")]
@@ -43,6 +43,15 @@ impl Timezone {
         match self {
             Timezone::Offset(o) => Ok(*o),
             Timezone::Named(name) => resolve_named(name),
+        }
+    }
+
+    /// Resolve to the offset in force at the wall-clock instant `local_secs`
+    /// (seconds since 1970-01-01T00:00 local time); DST-aware for IANA names.
+    pub fn resolve_at(&self, local_secs: i64) -> Result<UtcOffset, TemporalError> {
+        match self {
+            Timezone::Offset(o) => Ok(*o),
+            Timezone::Named(name) => resolve_named_at(name, local_secs),
         }
     }
 }
